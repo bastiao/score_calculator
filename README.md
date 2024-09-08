@@ -37,3 +37,12 @@ To run the tests, use:
 ```bash
 poetry run pytest
 ```
+
+
+### Publish to pypi
+
+
+```bash
+poetry build 
+poetry publish
+```
