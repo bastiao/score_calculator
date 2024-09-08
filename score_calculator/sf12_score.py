@@ -94,7 +94,6 @@ class SF12Score:
                 if col != eprocess_dataclude_column:
                     names.append(f"{col}_{i}")
                     arr[f"{col}_{i}"] = 0
-        print(names)
         return arr
     import re
 
@@ -123,19 +122,14 @@ class SF12Score:
     
     # ported from https://github.com/uo-cmor/SF6Dvalues
     def sf12_v2(self, input_data):
-        print("Scoring SF12 version 2")
-        print("Input data:")
+
         #rename keys of dict to match the expected keys
         input_data = {self.__replace_values()[k]: v for k, v in input_data.items()}
-        print(input_data)
         # Rename the columns
         #input_data = input_data.rename(columns=self.__replace_values())
-        print(input_data)
         dom_data = self.SF12_domains(input_data)
         final_score = self.calculate_final_score(dom_data)
-        print(f"The final score is: {final_score}")
         final_score_mcs = self.calculate_mcs_score(dom_data)
-        print(f"The final MSC score is: {final_score_mcs}")
         return (final_score, final_score_mcs, dom_data)
     
     def SF12_domains(self, x):
