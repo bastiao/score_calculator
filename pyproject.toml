@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "score_calculator"
-version = "1.0.1"
+version = "1.1.0"
 description = "This is a python library to calculate  12-item Short Form Survey (SF-12) score."
 authors = ["Luís Bastião Silva <luis.kop@gmail.com>"]
 readme = "README.md"
