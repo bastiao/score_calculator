@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-
+from score_calculator.sf12_utils import coalesce, recode, extract
 
 
 class SF12Score:
@@ -96,8 +96,162 @@ class SF12Score:
                     arr[f"{col}_{i}"] = 0
         print(names)
         return arr
-        
+    import re
+
+    def __replace_values(self):
+        replacements = {
+            "GH1": "Q1",
+            "PF02": "Q2",
+            "PF04": "Q3",
+            "RP2": "Q4",
+            "RP3": "Q5",
+            "RE2": "Q6",
+            "RE3": "Q7",
+            "BP2": "Q8",
+            "MH3": "Q9",
+            "VT2": "Q10",
+            "MH4": "Q11",
+            "SF2": "Q12"
+        }
+        return replacements
+
     def sf12(self, input_data):
+        """
+        Scores the SF12 questionnaire.
+        """
+        return self.sf12_v1(input_data)
+    
+    # ported from https://github.com/uo-cmor/SF6Dvalues
+    def sf12_v2(self, input_data):
+        print("Scoring SF12 version 2")
+        print("Input data:")
+        #rename keys of dict to match the expected keys
+        input_data = {self.__replace_values()[k]: v for k, v in input_data.items()}
+        print(input_data)
+        # Rename the columns
+        #input_data = input_data.rename(columns=self.__replace_values())
+        print(input_data)
+        dom_data = self.SF12_domains(input_data)
+        final_score = self.calculate_final_score(dom_data)
+        print(f"The final score is: {final_score}")
+        final_score_mcs = self.calculate_mcs_score(dom_data)
+        print(f"The final MSC score is: {final_score_mcs}")
+        return (final_score, final_score_mcs, dom_data)
+    
+    def SF12_domains(self, x):
+        """Calculate SF-12 domains.
+
+        Args:
+            x: SF-12 data (assuming a dictionary-like structure)
+
+        Returns:
+            A dictionary containing calculated SF-12 domains.
+
+        Raises:
+            ValueError: If the SF-12 version is 1 (not supported).
+        """
+
+        if getattr(x, 'version', None) == 1:
+            raise ValueError("SF-12 version 1 is not supported.")
+
+            return mapping.get(value, value)  # Return original value if not found in mapping
+
+        # Calculate domains (replace 'extract' with your data extraction logic)
+        PF = ((coalesce(extract(x, "Q2"), extract(x, "Q3")) 
+                + coalesce(extract(x, "Q3"), extract(x, "Q2")) - 2) / 4) * 100
+        RP = ((coalesce(extract(x, "Q4"), extract(x, "Q5")) 
+                + coalesce(extract(x, "Q5"), extract(x, "Q4")) - 2) / 8) * 100
+        BP = ((6 - extract(x, "Q8") - 1) / 4) * 100
+        GH = ((recode(extract(x, "Q1"), 5, 4.4, 3.4, 2, 1) - 1) / 4) * 100
+        VT = ((6 - extract(x, "Q10") - 1) / 4) * 100
+        SF = ((extract(x, "Q12") - 1) / 4) * 100
+        RE = ((coalesce(extract(x, "Q6"), extract(x, "Q7")) 
+                + coalesce(extract(x, "Q7"), extract(x, "Q6")) - 2) / 8) * 100
+        MH = ((coalesce(6 - extract(x, "Q9"), extract(x, "Q11")) 
+                + coalesce(extract(x, "Q11"), 6 - extract(x, "Q9")) - 2) / 8) * 100
+
+        # Standardize domains
+        PFz = (PF - 81.18122) / 29.10558
+        RPz = (RP - 80.52856) / 27.13526
+        BPz = (BP - 81.74015) / 24.53019
+        GHz = (GH - 72.19795) / 23.19041
+        VTz = (VT - 55.59090) / 24.84380
+        SFz = (SF - 83.73973) / 24.75775
+        REz = (RE - 86.41051) / 22.35543
+        MHz = (MH - 70.18217) / 20.50597
+
+        return {
+            'PF': PF, 'RP': RP, 'BP': BP, 'GH': GH, 'VT': VT, 'SF': SF, 'RE': RE, 'MH': MH,
+            'PFz': PFz, 'RPz': RPz, 'BPz': BPz, 'GHz': GHz, 'VTz': VTz, 'SFz': SFz, 'REz': REz, 'MHz': MHz
+        }
+        
+    def calculate_final_score(self, dom):
+        """Calculates the final score based on standardized SF-12 domain scores.
+
+        Args:
+            dom: A dictionary containing the standardized SF-12 domain scores 
+                (PFz, RPz, BPz, GHz, VTz, SFz, REz, MHz).
+
+        Returns:
+            The calculated final score.
+        """
+
+        # Calculate the Physical Component Summary (PCS) score (PHYS)
+        PHYS = (
+            dom["PFz"] * 0.42402
+            + dom["RPz"] * 0.35119
+            + dom["BPz"] * 0.31754
+            + dom["GHz"] * 0.24954
+            + dom["VTz"] * 0.02877
+            + dom["SFz"] * -0.00753
+            + dom["REz"] * -0.19206
+            + dom["MHz"] * -0.22069
+        )
+
+        # Calculate the final score by scaling and shifting the PCS score
+        final_score = 50 + PHYS * 10
+
+        return final_score
+
+        # Example usage (replace with your actual 'dom' data)
+        dom_data = {
+            "PFz": 0.5,
+            "RPz": 0.3,
+            "BPz": 0.2,
+            "GHz": 0.4,
+            "VTz": 0.6,
+            "SFz": 0.1,
+            "REz": 0.7,
+            "MHz": 0.8,
+        }
+    def calculate_mcs_score(self, dom):
+        """Calculates the Mental Component Summary (MCS) score based on standardized SF-12 domain scores.
+
+        Args:
+            dom: A dictionary containing the standardized SF-12 domain scores 
+                (PFz, RPz, BPz, GHz, VTz, SFz, REz, MHz).
+
+        Returns:
+            The calculated final MCS score.
+        """
+
+        # Calculate the Mental Component Summary (MCS) score (MENT)
+        MENT = (
+            dom["PFz"] * -0.22999
+            + dom["RPz"] * -0.12329
+            + dom["BPz"] * -0.09731
+            + dom["GHz"] * -0.01571
+            + dom["VTz"] * 0.23534
+            + dom["SFz"] * 0.26876
+            + dom["REz"] * 0.43407
+            + dom["MHz"] * 0.48581
+        )
+
+        # Calculate the final MCS score by scaling and shifting the MENT score
+        final_mcs_score = 50 + MENT * 10
+
+        return final_mcs_score  
+    def sf12_v1(self, input_data):
         """
         Scores the SF12 questionnaire.
 
